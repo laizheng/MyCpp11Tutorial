@@ -53,8 +53,8 @@ double && r3 = bar();
 
 ### The Fuller Picture in C++11
 
-Inline-style:
-![alt text](/value_cat.png")
+ValueCategories:
+![ValueCategories](https://github.com/laizheng/learn_cpp11/blob/master/value_cat.png")
 
 
 With the introduction of move semantics in C++11, value categories were redefined to characterize two independent properties of expressions:
