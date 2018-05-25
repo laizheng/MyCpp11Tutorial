@@ -50,38 +50,6 @@ int && r2 = x + y;
 int bar() { return 5; }
 double && r3 = bar();
 ```
-### Lvalue & Rvalue Binding
-Examples:
-
-```cpp
-    #include <iostream>
-    void foo(int&)
-    {
-        std::cout << "non-const lvalue ref\n";
-    }
-    void foo(int&&)
-    {
-        std::cout << "non-const rvalue ref\n";
-    }
-    void bar(const int&)
-    {
-        std::cout << "const lvalue ref\n";
-    }
-    int main()
-    {
-        int a = 0;
-        foo(a);
-        foo(5);
-        bar(a);
-        bar(5);
-    }
-/* std output
-non-const lvalue ref
-non-const rvalue ref
-const lvalue ref
-const lvalue ref
-*/
-```
 
 ### The Fuller Picture in C++11
 The following is a very brief summary of value categorization in c++11. The graph may help you when we read std container library documents in the future.   
@@ -174,7 +142,7 @@ int main()
 {
   Useless one(10, 'x');
   Useless two = one;
-  Useless three(20, 'o');
+  Useless three(20, 'o');0
   Useless four (one + three); // calls operator+(), move constructor
 }
 ```
@@ -195,21 +163,57 @@ int main() {
   four = std::move(one); // forced move assignment
 }
 ```
-
-### A Overloading Confusion
-Suppose we have overloaded function as follows. Which foo() will be called?
+One very important thing to understand is that `std::move` doesn't actually "move" anything: it simply casts an expression to an rvalue.
 ```cpp
-void foo(int && x) {cout << "move foo called\n";}
-void foo(const int & x) {cout << "const reference foo called\n";}
+void noop_example()
+{
+    std::vector<int> v0{1, 2, 3, 4, 5};
+    std::move(v0); // No-op.
+    v0.size(); // Perfectly safe.
+}
+```
+### Binding & Function Overloading
+An rvalue can bind to both const lvalue reference and rvalue reference. Suppose we have overloaded function as follows. Which foo() will be called?
+```cpp
+void foo(int && x) {cout << "rvalue reference foo called\n";}
+void foo(const int & x) {cout << "const lvalue reference foo called\n";}
 int main() {
-    int x = 10;
-    foo(std::move(x)); // 1st foo()
-    foo(5); // 1st foo()
-    foo(x); // 2nd foo()
-    // if void foo(int && x) is not present, 2nd foo() will be called for all 3 cases.
+    foo(std::move(x)); // 2nd foo()
+    foo(5); // 2nd foo()
 }
 ```
 More formally:
 * An rvalue may be used to initialize a __const lvalue reference__, in which case the lifetime of the object identified by the rvalue is extended until the scope of the reference ends.
 * An rvalue may be used to initialize an __rvalue reference__, in which case the lifetime of the object identified by the rvalue is extended until the scope of the reference ends.
 * When used as a function argument and when two overloads of the function are available, one taking rvalue reference parameter and the other taking lvalue reference to const parameter, an rvalue binds to the rvalue reference overload (thus, if both copy and move constructors are available, an rvalue argument invokes the move constructor, and likewise with copy and move assignment operators).
+
+### Move Semantics & Return Statement
+In the following code snippet, the std::move on tmp is unnecessary and can actually be a performance pessimization as it will inhibit return value optimization.
+```cpp
+std::vector<int> return_vector(void)
+{
+    std::vector<int> tmp {1,2,3,4,5};
+    return std::move(tmp);
+}
+std::vector<int> &&rval_ref = return_vector();
+```
+Best Practice:
+```cpp
+std::vector<int> return_vector(void)
+{
+    std::vector<int> tmp {1,2,3,4,5};
+    return tmp;
+}
+std::vector<int> rval_ref = return_vector();
+```
+There is one case returning rvalue reference makes sense. That is, if you want to return a struct/class member variable, RVO is not performed.
+```cpp
+struct Beta {
+  Beta_ab ab;
+  Beta_ab const& getAB() const& { return ab; }
+  Beta_ab && getAB() && { return move(ab); }
+  // second "&&" above is member function ref-qualifiers, also added in c++11!
+  // https://stackoverflow.com/questions/28066777/const-and-specifiers-for-member-functions-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+};
+Beta_ab ab = Beta().getAB(); // invoke move
+```
