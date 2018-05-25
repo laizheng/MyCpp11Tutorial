@@ -84,7 +84,7 @@ const lvalue ref
 ```
 
 ### The Fuller Picture in C++11
-The following is a very brief summary of value categorization in c++11. The graph may help you when we read std container library documents in the future.
+The following is a very brief summary of value categorization in c++11. The graph may help you when we read std container library documents in the future.   
 ![ValueCategories](ValueCategories.png)
 
 With the introduction of move semantics in C++11, value categories were redefined to characterize two independent properties of expressions:
