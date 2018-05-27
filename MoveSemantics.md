@@ -1,7 +1,7 @@
 # Move Semantics
 The main benefit rvalue references bring to most programmers is not the opportunity to write code using them. Rather, it is the opportunity to use library code that utilizes rvalue references to implement move semantics. For example, the STL classes now have copy constructors, move constructors, copy assignment operators, and move assignment operators.
 ## Values Categories
-Each C++ expression (an operator with its operands, a literal, a variable name, etc.) is characterized by two independent properties: a __type__ and a __value category__. In practice we usually only concern two types, __rvalue__ and __lvalue__.   
+Each C++ __expression__ (an operator with its operands, a literal, a variable name, etc. Note: value categories do not refer to variable categories, but refer to expression categories. [JL]) is characterized by two independent properties: a __type__ and a __value category__. In practice we usually only concern two types, __rvalue__ and __lvalue__.   
 
 Full legal descriptions of value category:   
 <a href="http://en.cppreference.com/w/cpp/language/value_category">http://en.cppreference.com/w/cpp/language/value_category</a>  
@@ -213,7 +213,89 @@ struct Beta {
   Beta_ab const& getAB() const& { return ab; }
   Beta_ab && getAB() && { return move(ab); }
   // second "&&" above is member function ref-qualifiers, also added in c++11!
-  // https://stackoverflow.com/questions/28066777/const-and-specifiers-for-member-functions-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+  // Note that move in this case is not optional, because ab is neither a local automatic nor a temporary rvalue. https://stackoverflow.com/questions/28066777/const-and-specifiers-for-member-functions-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 };
 Beta_ab ab = Beta().getAB(); // invoke move
+```
+
+### Practical Use of std::move
+Many, if not all, of std containers are move-aware.
+```cpp
+// std::vector::push_back
+void push_back( const T& value );
+void push_back( T&& value );
+
+// std::vector::operator=
+vector& operator=( const vector& other );
+vector& operator=( vector&& other );
+
+// std::vector::vector
+vector( const vector& other );
+vector( vector&& other );
+```
+
+The entire container can be moved to a destination, or items can be moved inside the containers.
+
+```cpp
+// Moves whole container
+std::vector<foo> v;
+auto v_copy = v;
+auto v_move = std::move(v);
+
+// Moves the temporary inside the vector.
+v.push_back(foo{});
+
+foo f;
+// Copies `f` inside the vector.
+v.push_back(f);
+// Moves `f` inside the vector.
+v.push_back(std::move(f));
+```
+
+Another example:
+```cpp
+std::vector<int> get_vector(int x);
+void consume_vector(std::map<int, std::vector<int>> m);
+
+std::map<int, std::vector<int>> map_of_vector;
+for(int i = 0; i < 100; ++i)
+{
+    // invoke vector move assignment operator
+    map_of_vector[i] = get_vector(i);
+}
+// invoke map move constructor operator
+consume_vector(std::move(map_of_vector));
+```
+
+Some classes provided by the Standard Library can only be moved.
+```cpp
+std::thread t{[] { std::cout << "hello!"; }};
+// auto t_copy = t; // Does not compile.
+auto t_move = std::move(t);
+
+std::unique_ptr<int> up = std::make_unique<int>(1);
+// auto up_copy = up; // Does not compile.
+auto up_move = std::move(up);
+```
+
+__Pass-by-Value and Move Idiom__   
+What's the problem? Consider the following constructor for class Person.
+```cpp
+struct Person
+{
+    std::string name;
+    Person(const std::string& name) : name{name} {} // 1 Copy
+    Person(std::string&& name) : name{std::move(name)} {} // 1 Move
+};
+```
+The code is optimal for users of the class. However, if the number of parameters are N, we need to write 2^N overloaded constructor. Ouch! That's when the "pass-by-value and move" comes in handy.
+```cpp
+struct Person
+{
+    std::string name;
+    // * Lvalue => 1 copy + 1 move
+    // * Rvalue => 2 moves
+    // Move is cheap; close to optimal
+    Person(std::string name) : name{std::move(name)} {}
+};
 ```
