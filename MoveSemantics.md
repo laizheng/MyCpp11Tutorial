@@ -107,9 +107,11 @@ public:
 
 Useless::Useless(const Useless & f): n(f.n) {
   ++ct;
+  pc = new char[n];
   for (int i = 0; i < n; i++)
-  pc[i] = f.pc[i]; ShowObject();
+  pc[i] = f.pc[i];
 }
+
 Useless::Useless(Useless && f): n(f.n) {
   ++ct;
   f.pc = nullptr; // give old object nothing in return
