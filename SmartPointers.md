@@ -72,7 +72,51 @@ int main()
 ### Runtime overhead
 std::unique_ptr can be thought as a zero-cost abstract. Refer to the following comparison of assembly codes:
 ![Over Head of std::unique_ptr](unique_ptr_overhead.png)
-### Exception-safe std::unique_ptr
+### Exception-safety std::unique_ptr
+There's no such guarantee in the evaluation order in C++ function parameters([Reference](https://stackoverflow.com/a/2934909/6585344)). Consider the following codes:
+```cpp
+void foo(std::unique_ptr<int>, int);
+int bar() { throw std::runtime_error{"whoops!"}; }
+int main()
+{
+    foo(std::unique_ptr<int>{new int{5}}, bar());
+}
+```
+The evaluation order for function parameters of foo() can be any of the following:
+
+Order #0:
+* Allocate memory for `new int{5}`
+* Construct `unique_ptr`
+* Invoke `bar()` and throw
+
+Order #1:
+* Invoke `bar()` and throw
+* Allocate memory for `new int{5}`
+* Construct `unique_ptr`
+
+Order #2:
+* Allocate memory for `new int{5}`
+* Invoke `bar()` and throw
+* Construct `unique_ptr`
+
+We see that if order #2 take place, then we have memory leak. In C++14, std::make_unique is introduced to solve this issue.
+```cpp
+// Template declaration of std::make_unique
+template< class T, class... Args >
+unique_ptr<T> make_unique( Args&&... args );
+
+foo(std::make_unique<int>(5), bar());
+```
+The arguments args are passed to the constructor of T, thus avoiding extra level of evaluation. Hence, `std::make_unique` above will not interleave an allocation with the call to `bar()`. However, in C++11 std::make_unique is not defined yet, therefore we need to make our own make_unique if our funtion contain more than one parameters other than make_unique and they can throw.
+```cpp
+// Defining your own make_unique;
+// Remember to put it into a namespace other than std!
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+```
 ## std::shared_ptr
 `std::shared_ptr<T>` Manages the storage of a pointer, providing a limited garbage-collection facility, possibly sharing that management with other objects. It is a __copyable class__ that represents shared ownership over a dynamically allocated object. It uses __"reference counting"__ to keep track of how many alive owners are present and releases the memory when that count reaches zero.
 
