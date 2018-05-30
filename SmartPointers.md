@@ -47,7 +47,7 @@ int useSmart() {
 }
 ```
 #### Unique pointer and functions
----
+******
 Examples of returning/accepting `std::unique_ptr` instances from/to functions.
 ```cpp
 std::unique_ptr<foo> bar()
@@ -71,11 +71,11 @@ int main()
 }
 ```
 #### Runtime overhead
----
+******
 std::unique_ptr can be thought as a zero-cost abstract. Refer to the following comparison of assembly codes:
 ![Over Head of std::unique_ptr](unique_ptr_overhead.png)
 #### Exception-safety
----
+******
 There's no such guarantee in the evaluation order in C++ function parameters([Reference](https://stackoverflow.com/a/2934909/6585344)). Consider the following codes:
 ```cpp
 void foo(std::unique_ptr<int>, int);
@@ -127,7 +127,7 @@ std::unique_ptr<T> make_unique(Args&&... args)
 + Moving a `std::shared_ptr` transfers ownership: does not increase `use_count`.
 
 #### Constructing shared pointer
----
+******
 __Top line__: prefer using std::make_shared instead of constructing std::shared_ptr using raw pointer.
 
 It's legal to construct std::shared_ptr from raw pointer:
@@ -155,11 +155,11 @@ shared_ptr<Foo> f = move(u);
 ```
 
 #### Runtime overhead
----
+******
 Check out the comparison of compiled codes here: [Link](https://godbolt.org/g/Khj7Yn).
 `std::shared_ptr` has time overhead in constructor (to create the reference counter), in destructor (to decrement the reference counter and possibly destroy the object) and in assignment operator (to increment the reference counter). Due to thread-safety guarantees of std::shared_ptr, these increments/decrements are atomic, thus adding some more overhead.
 #### More on thread safety
----
+******
 std::shared_ptr can work in multiple threads, provided each thread has __its own copy or copies__. In this case, the changes to the reference count are indeed synchronized(but it's our responsibility that make sure what we do with the shared data is correctly synchronized).
 + Standard guarantees reference counting is handled thread safe and it's platform independent
 + Standard guarantees that only one thread (holding last reference) will call delete on shared object
@@ -237,7 +237,7 @@ int main()
 As an observer, std::weak_ptr does not increase the `use_count` of the std::shared_ptr it observes. The property makes it possible to use std::weak_ptr to break circular references of std::shared_ptr.
 
 #### Circular references of shared pointer
----
+******
 We saw how std::shared_ptr allowed us to have multiple smart pointers co-owning the same resource. However, in certain cases, this can become problematic. Consider the following case, where the shared pointers in two separate objects each point at the other object.
 
 ```cpp

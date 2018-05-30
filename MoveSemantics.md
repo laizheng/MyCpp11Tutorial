@@ -6,7 +6,8 @@ Each C++ __expression__ (an operator with its operands, a literal, a variable na
 Full legal descriptions of value category:   
 <a href="http://en.cppreference.com/w/cpp/language/value_category">http://en.cppreference.com/w/cpp/language/value_category</a>  
 
-### lvalue
+#### lvalue
+******
 An lvalue is an expression, such as a variable name or a dereferenced pointer, that represents data for which the program __can obtain an address__. Originally, an lvalue was one that could appear on the left side of an assignment statement.
 
 ```cpp
@@ -22,7 +23,8 @@ int& bar() { static int i = 0; return i; }
 &bar();
 bar() = 5;
 ```
-### rvalue
+#### rvalue
+******
 Rvalue reference, indicated by using &&, can bind to rvalues—that is, values that can appear on the right-hand side of an assignment expression but for which one cannot apply the address operator.
 
 Example of rvalues:
@@ -51,7 +53,8 @@ int bar() { return 5; }
 double && r3 = bar();
 ```
 
-### The Fuller Picture in C++11
+#### The Fuller Picture in C++11
+******
 The following is a very brief summary of value categorization in c++11. The graph may help you when we read std container library documents in the future.   
 ![ValueCategories](ValueCategories.png)
 
@@ -68,8 +71,6 @@ In C++11, expressions that:
 The expressions that have identity are called "glvalue expressions" (glvalue stands for "generalized lvalue"). Both lvalues and xvalues are glvalue expressions. The expressions that can be moved from are called "rvalue expressions". Both prvalues and xvalues are rvalue.
 
 ## Move Semantics and the Rvalue Reference
-
-### The Need for Move Semantics
 Let’s look into the copying process as it worked prior to C++11. Suppose we start with something like this:
 
 ```cpp
@@ -85,7 +86,8 @@ vector( const vector& other );
 vector( vector&& other );
 ```
 
-### A Move Examples
+#### A Move Examples
+******
 The following is example (shortten) given in the book of C++ primer plus. Notice how the move constructor nullified memory controlled by the passed-in parameter f. The same considerations that make move semantics appropriate for constructors make them appropriate for assignment.
 
 __Also notice the move  operator parameter is not a const reference because the method alters the source object.__
@@ -149,8 +151,9 @@ int main()
 }
 ```
 
-### Forcing a Move
-What if you want to move a lvalue? C++11 provides a simpler way to do this—use the __std::move()__ function, which is declared in the utility header file. std::move() is equivalent to the following:
+#### Forcing a Move
+******
+What if you want to move a lvalue? C++11 provides a simpler way to do this—use the __std::move()__ function, which is declared in the utility header file. `std::move()` is equivalent to the following:
 ```cpp
 static_cast<typename std::remove_reference<T>::type&&>(t)
 ```
@@ -174,7 +177,17 @@ void noop_example()
     v0.size(); // Perfectly safe.
 }
 ```
-### Binding & Function Overloading
+We should realize that the std::move() function doesn’t necessarily produce a move operation. Suppose, for instance, that Chunk is a class with private data and that we have the following code:
+```cpp
+Chunk one;
+...
+Chunk two;
+two = std::move(one); // move semantics?
+```
+If the Chunk class doesn’t define a move assignment operator, the compiler will use the copy assignment operator. And if that also isn’t defined, then assignment isn’t allowed at all.
+
+#### Binding & Function Overloading
+******
 An rvalue can bind to both const lvalue reference and rvalue reference. Suppose we have overloaded function as follows. Which foo() will be called?
 ```cpp
 void foo(int && x) {cout << "rvalue reference foo called\n";}
@@ -189,7 +202,8 @@ More formally:
 * An rvalue may be used to initialize an __rvalue reference__, in which case the lifetime of the object identified by the rvalue is extended until the scope of the reference ends.
 * When used as a function argument and when two overloads of the function are available, one taking rvalue reference parameter and the other taking lvalue reference to const parameter, an rvalue binds to the rvalue reference overload (thus, if both copy and move constructors are available, an rvalue argument invokes the move constructor, and likewise with copy and move assignment operators).
 
-### Move Semantics & Return Statement
+#### Move Semantics & Return Statement
+******
 In the following code snippet, the std::move on tmp is unnecessary and can actually be a performance pessimization as it will inhibit return value optimization.
 ```cpp
 std::vector<int> return_vector(void)
@@ -208,19 +222,21 @@ std::vector<int> return_vector(void)
 }
 std::vector<int> rval_ref = return_vector();
 ```
-There is one case returning rvalue reference makes sense. That is, if you want to return a struct/class member variable, RVO is not performed.
+There is one case returning rvalue reference makes sense. That is, if you want to return a struct/class member variable, RVO is not performed([stackoverflow reference](https://stackoverflow.com/questions/28066777/const-and-specifiers-for-member-functions-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa)).
 ```cpp
 struct Beta {
   Beta_ab ab;
   Beta_ab const& getAB() const& { return ab; }
   Beta_ab && getAB() && { return move(ab); }
   // second "&&" above is member function ref-qualifiers, also added in c++11!
-  // Note that move in this case is not optional, because ab is neither a local automatic nor a temporary rvalue. https://stackoverflow.com/questions/28066777/const-and-specifiers-for-member-functions-in-c?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+  // Note that move in this case is not optional, because ab is
+  // neither a local automatic nor a temporary rvalue.
 };
 Beta_ab ab = Beta().getAB(); // invoke move
 ```
 
-### Practical Use of std::move
+#### Practical Use of std::move
+******
 Many, if not all, of std containers are move-aware.
 ```cpp
 // std::vector::push_back
@@ -280,7 +296,8 @@ std::unique_ptr<int> up = std::make_unique<int>(1);
 auto up_move = std::move(up);
 ```
 
-__Pass-by-Value and Move Idiom__   
+#### Pass-by-Value and Move Idiom
+******
 What's the problem? Consider the following constructor for class Person.
 ```cpp
 struct Person
