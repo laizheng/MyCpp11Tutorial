@@ -1,4 +1,5 @@
-# Smart Pointers
+Smart Pointers
+======
 Problems:
 + Forget to use delete - memory leak
 + Use delete multiple times - double free
@@ -19,9 +20,8 @@ std::shared_ptr<double> pshared(p_reg); // allowed (explicit conversion)
 The smart pointer template classes are defined so that in most respects a smart pointer object acts like a regular pointer. For example, given that ps is a smart pointer object, you can dereference it (`*ps`), use it to access structure members (`ps->puffIndex`).
 
 To use smart pointers, the `<memory>` header must be included.
-## std::unique_ptr
-### std::unique_ptr as a move-only class
-`std::unique_ptr<T>` is a move-only class that represents unique ownership over a dynamically allocated object.
+## Unique pointer
+`std::unique_ptr<T>` is a __move-only__ class that represents unique ownership over a dynamically allocated object.
 ```cpp
 struct foo
 {
@@ -46,7 +46,8 @@ int useSmart() {
   auto f2 = std::move(f);
 }
 ```
-### Returning/accepting std::unique_ptr from/to functions
+#### Unique pointer and functions
+---
 Examples of returning/accepting `std::unique_ptr` instances from/to functions.
 ```cpp
 std::unique_ptr<foo> bar()
@@ -69,10 +70,12 @@ int main()
     take_ownership(std::move(f)); // Need to use std::move, otherwise f is lvalue
 }
 ```
-### Runtime overhead
+#### Runtime overhead
+---
 std::unique_ptr can be thought as a zero-cost abstract. Refer to the following comparison of assembly codes:
 ![Over Head of std::unique_ptr](unique_ptr_overhead.png)
-### Exception-safety std::unique_ptr
+#### Exception-safety
+---
 There's no such guarantee in the evaluation order in C++ function parameters([Reference](https://stackoverflow.com/a/2934909/6585344)). Consider the following codes:
 ```cpp
 void foo(std::unique_ptr<int>, int);
@@ -117,19 +120,20 @@ std::unique_ptr<T> make_unique(Args&&... args)
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 ```
-## std::shared_ptr
+## Shared Pointer
 `std::shared_ptr<T>` Manages the storage of a pointer, providing a limited garbage-collection facility, possibly sharing that management with other objects. It is a __copyable class__ that represents shared ownership over a dynamically allocated object. It uses __"reference counting"__ to keep track of how many alive owners are present and releases the memory when that count reaches zero.
 
 + Copying a `std::shared_ptr` shares ownership: increase `use_count`.
 + Moving a `std::shared_ptr` transfers ownership: does not increase `use_count`.
 
-### Constructing std::shared_ptr
-It's legal to construct std::shared_ptr from raw pointer:
+#### Constructing shared pointer
+---
+__Top line__: prefer using std::make_shared instead of constructing std::shared_ptr using raw pointer.
 
+It's legal to construct std::shared_ptr from raw pointer:
 ```cpp
 std::shared_ptr<int> s0{new int{5}};
 ```
-
 However, it's more ideal to use std::make_shared to construct std::shared_ptr, for the following reason:
 + Prevents memory leaks due to unspecified order of evaluation (just as explained in std::unique_ptr)
 + Prevents an unnecessary additional allocation and improves cache locality.
@@ -141,7 +145,7 @@ For the 2nd point, compared with `std::shared_ptr<int> s0{new int{5}};`, constru
 * Once for the `int`
 * Once for the `shared_ptr`'s control block
 
-This is wasteful, as both allocations could be coalesced into one. `std::make_shared` allows implementations to only allocate once for both the shared object and the control block. Having one allocation has the additional benefit of cache locality. Plus, std::make_shared is available in C++11, unlike std::make_unique. __Prefer using std::make_shared__ instead of constructing std::shared_ptr using raw pointer.
+This is wasteful, as both allocations could be coalesced into one. `std::make_shared` allows implementations to only allocate once for both the shared object and the control block. Having one allocation has the additional benefit of cache locality. Plus, std::make_shared is available in C++11, unlike std::make_unique.
 
 It's also possible to construct a std::shared_ptr by moving ownership from std::unique_ptr to std::shared_ptr. The std::unique_ptr being moved from manages no object after the call.
 
@@ -150,9 +154,22 @@ unique_ptr<Foo> u(new Foo);
 shared_ptr<Foo> f = move(u);
 ```
 
-### Performance cost and Concurrency consideration
+#### Runtime overhead
+---
+Check out the comparison of compiled codes here: [Link](https://godbolt.org/g/Khj7Yn).
+`std::shared_ptr` has time overhead in constructor (to create the reference counter), in destructor (to decrement the reference counter and possibly destroy the object) and in assignment operator (to increment the reference counter). Due to thread-safety guarantees of std::shared_ptr, these increments/decrements are atomic, thus adding some more overhead.
+#### More on thread safety
+---
+std::shared_ptr can work in multiple threads, provided each thread has __its own copy or copies__. In this case, the changes to the reference count are indeed synchronized(but it's our responsibility that make sure what we do with the shared data is correctly synchronized).
++ Standard guarantees reference counting is handled thread safe and it's platform independent
++ Standard guarantees that only one thread (holding last reference) will call delete on shared object
++ shared_ptr does not guarantee any thread safety for object stored in it?
 
-## std::weak_ptr
+![Separate Instance is Thread-safe](shared_ptr_separate_instances.png)
+
+But if multiple threads of execution access the same shared_ptr instance without synchronization and any of those accesses uses a non-const member function of shared_ptr then a data race will occur; the shared_ptr overloads of atomic functions can be used to prevent the data race.
+
+## Weak Pointer
 std::weak_ptr can be thought of as an __observer__ to an object that is managed by std::shared_ptr. It must be converted to std::shared_ptr in order to access the referenced object.
 + `std::weak_ptr` can only be constructed from instances of `std::shared_ptr` or other weak pointers.
 + `std::weak_ptr::lock` must be called to in order to access the referenced object: it return a new std::shared_ptr that shares ownership of the managed object.
@@ -219,60 +236,9 @@ int main()
 
 As an observer, std::weak_ptr does not increase the `use_count` of the std::shared_ptr it observes. The property makes it possible to use std::weak_ptr to break circular references of std::shared_ptr.
 
-### Circular references of std::shared_ptr
-
-```cpp
-oid cycle()
-{
-    struct b;
-
-    struct a {
-        std::shared_ptr<b> pb;
-        ~a() { std::cout << "~a()\n"; }
-    };
-
-    struct b
-    {
-        std::shared_ptr<a> pa;
-        ~b() { std::cout << "~b()\n"; }
-    };
-
-    auto sa = std::make_shared<a>();
-    auto sb = std::make_shared<b>();
-    sb->pa = sa;
-    sa->pb = sb;
-}
-
-void weak_cycle()
-{
-    struct b;
-
-    struct a {
-        std::shared_ptr<b> pb;
-        ~a() { std::cout << "~a()\n"; }
-    };
-
-    struct b
-    {
-        std::weak_ptr<a> pa;
-        ~b() { std::cout << "~b()\n"; }
-    };
-
-    auto sa = std::make_shared<a>();
-    auto sb = std::make_shared<b>();
-    sb->pa = sa;
-    sa->pb = sb;
-}
-
-int main()
-{
-    std::cout << "cycle()\n";
-    cycle();
-
-    std::cout << "\nweak_cycle()\n";
-    weak_cycle();
-}
-```
+#### Circular references of shared pointer
+---
+We saw how std::shared_ptr allowed us to have multiple smart pointers co-owning the same resource. However, in certain cases, this can become problematic. Consider the following case, where the shared pointers in two separate objects each point at the other object.
 
 ```cpp
 #include <iostream>
@@ -319,72 +285,13 @@ int main()
 	return 0;
 }
 ```
+Try running the codes above and we see that `lucy` and `ricky` is never destructed. To break the circular dependency, use `std::weak_ptr<Person>` for `Person`'s member `m_partner`. The rest of the codes are not changed. This time we will see that both `lucy` and `ricky` are destructed when the shared pointer for them expires.
 
 ```cpp
-#include <iostream>
-#include <memory> // for std::shared_ptr
-
-class Resource
-{
-public:
-	std::shared_ptr<Resource> m_ptr; // initially created empty
-
-	Resource() { std::cout << "Resource acquired\n"; }
-	~Resource() { std::cout << "Resource destroyed\n"; }
-};
-
-int main()
-{
-	auto ptr1 = std::make_shared<Resource>();
-
-	ptr1->m_ptr = ptr1; // m_ptr is now sharing the Resource that contains it
-
-	return 0;
-}
-```
-Solve:
-```cpp
-#include <iostream>
-#include <memory> // for std::shared_ptr and std::weak_ptr
-#include <string>
-
 class Person
 {
-	std::string m_name;
+	...
 	std::weak_ptr<Person> m_partner; // note: This is now a std::weak_ptr
-
-public:
-
-	Person(const std::string &name): m_name(name)
-	{
-		std::cout << m_name << " created\n";
-	}
-	~Person()
-	{
-		std::cout << m_name << " destroyed\n";
-	}
-
-	friend bool partnerUp(std::shared_ptr<Person> &p1, std::shared_ptr<Person> &p2)
-	{
-		if (!p1 || !p2)
-			return false;
-
-		p1->m_partner = p2;
-		p2->m_partner = p1;
-
-		std::cout << p1->m_name << " is now partnered with " << p2->m_name << "\n";
-
-		return true;
-	}
+  ...
 };
-
-int main()
-{
-	auto lucy = std::make_shared<Person>("Lucy");
-	auto ricky = std::make_shared<Person>("Ricky");
-
-	partnerUp(lucy, ricky);
-
-	return 0;
-}
 ```
