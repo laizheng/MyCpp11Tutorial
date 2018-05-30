@@ -234,8 +234,29 @@ struct Beta {
 };
 Beta_ab ab = Beta().getAB(); // invoke move
 ```
-
-#### Practical Use of std::move
+#### Pass-by-Value and Move Idiom
+******
+What's the problem? Consider the following constructor for class Person.
+```cpp
+struct Person
+{
+    std::string name;
+    Person(const std::string& name) : name{name} {} // 1 Copy
+    Person(std::string&& name) : name{std::move(name)} {} // 1 Move
+};
+```
+The code is optimal for users of the class. However, if the number of parameters are N, we need to write 2^N overloaded constructor. Ouch! That's when the "pass-by-value and move" comes in handy.
+```cpp
+struct Person
+{
+    std::string name;
+    // * Lvalue => 1 copy + 1 move
+    // * Rvalue => 2 moves
+    // Move is cheap; close to optimal
+    Person(std::string name) : name{std::move(name)} {}
+};
+```
+#### Standard library support of moveble type
 ******
 Many, if not all, of std containers are move-aware.
 ```cpp
@@ -253,24 +274,6 @@ vector( vector&& other );
 ```
 
 The entire container can be moved to a destination, or items can be moved inside the containers.
-
-```cpp
-// Moves whole container
-std::vector<foo> v;
-auto v_copy = v;
-auto v_move = std::move(v);
-
-// Moves the temporary inside the vector.
-v.push_back(foo{});
-
-foo f;
-// Copies `f` inside the vector.
-v.push_back(f);
-// Moves `f` inside the vector.
-v.push_back(std::move(f));
-```
-
-Another example:
 ```cpp
 std::vector<int> get_vector(int x);
 void consume_vector(std::map<int, std::vector<int>> m);
@@ -296,25 +299,31 @@ std::unique_ptr<int> up = std::make_unique<int>(1);
 auto up_move = std::move(up);
 ```
 
-#### Pass-by-Value and Move Idiom
-******
-What's the problem? Consider the following constructor for class Person.
+Containers allow us to go one step further, and sometimes allow us to entirely avoid the move. This can happen when an item is being constructed "in place" inside the container. This operation is called "emplacement" and is
+supported by most Standard Library containers.
 ```cpp
-struct Person
+// std::vector::emplace_back declaration
+template< class... Args >
+void emplace_back( Args&&... args );
+
+struct bar
 {
-    std::string name;
-    Person(const std::string& name) : name{name} {} // 1 Copy
-    Person(std::string&& name) : name{std::move(name)} {} // 1 Move
+    int x;
+    bar(int x) : x{x} { std::cout << "bar(int)\n"; }
+    bar(const bar&)    { std::cout << "bar(const bar&)\n"; }
+    bar(bar&&)         { std::cout << "bar(bar&&)\n"; }
+    bar()              { std::cout << "bar()\n"; }
 };
-```
-The code is optimal for users of the class. However, if the number of parameters are N, we need to write 2^N overloaded constructor. Ouch! That's when the "pass-by-value and move" comes in handy.
-```cpp
-struct Person
+
+void vector_emplacement()
 {
-    std::string name;
-    // * Lvalue => 1 copy + 1 move
-    // * Rvalue => 2 moves
-    // Move is cheap; close to optimal
-    Person(std::string name) : name{std::move(name)} {}
-};
+    std::vector<bar> v;
+    v.reserve(10);
+
+    // Moves `bar` temporary
+    v.push_back(bar{42});
+
+    // Constructs `bar` instance "in place"
+    v.emplace_back(42);
+}
 ```
