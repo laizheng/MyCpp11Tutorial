@@ -1,10 +1,9 @@
 # Move Semantics
-The main benefit rvalue references bring to most programmers is not the opportunity to write code using them. Rather, it is the opportunity to use library code that utilizes rvalue references to implement move semantics. For example, the STL classes now have copy constructors, move constructors, copy assignment operators, and move assignment operators.
+C++11 enables a technique called move semantics. The STL classes now have copy constructors, move constructors, copy assignment operators, and move assignment operators. This articles first examine the value categories, then will go over the basics of using move semantics.
 ## Values Categories
 Each C++ __expression__ (an operator with its operands, a literal, a variable name, etc. Note: value categories do not refer to variable categories, but refer to expression categories. [JL]) is characterized by two independent properties: a __type__ and a __value category__. In practice we usually only concern two types, __rvalue__ and __lvalue__.   
 
-Full legal descriptions of value category:   
-<a href="http://en.cppreference.com/w/cpp/language/value_category">http://en.cppreference.com/w/cpp/language/value_category</a>  
+Full legal descriptions of value category: [link](http://en.cppreference.com/w/cpp/language/value_category)
 
 #### lvalue
 ******
@@ -92,62 +91,127 @@ The following is example (shortten) given in the book of C++ primer plus. Notice
 
 __Also notice the move  operator parameter is not a const reference because the method alters the source object.__
 ```cpp
+// uselessm.cpp -- an otherwise useless class with move semantics
 #include <iostream>
+#include <utility>
 using namespace std;
-class Useless {
+
+// interface
+class Useless
+{
 private:
-  int n; // number of elements
-  char * pc; // pointer to data
-  static int ct; // number of objects
+    int n;          // number of elements
+    char * pc;      // pointer to data
+    static int ct;  // number of objects
+    void ShowObject() const;
 public:
-  Useless();
-  explicit Useless(int k);
-  Useless(int k, char ch);
-  Useless(const Useless & f);
-  Useless operator+(const Useless & f)const;
+    Useless();
+    explicit Useless(int k);
+    Useless(int k, char ch);
+    Useless(const Useless & f); // regular copy constructor
+    Useless(Useless && f);      // move constructor
+    ~Useless();
+    Useless operator+(const Useless & f)const;
+    // need operator=() in copy and move versions
+    void ShowData() const;
 };
 
-Useless::Useless(const Useless & f): n(f.n) {
-  ++ct;
-  pc = new char[n];
-  for (int i = 0; i < n; i++)
-  pc[i] = f.pc[i];
-}
+// implementation
+int Useless::ct = 0;
 
-Useless::Useless(Useless && f): n(f.n) {
-  ++ct;
-  f.pc = nullptr; // give old object nothing in return
-  f.n = 0;
-  ShowObject();
-}
-Useless & Useless::operator=(const Useless & f) // copy assignment
+Useless::Useless()
 {
-  if (this == &f)
-  return * this;
-  delete [] pc;
-  n = f.n;
-  pc = new char[n];
-  for (int i = 0; i < n; i++)
-  pc[i] = f.pc[i];
-  return * this;
+    ++ct;
+    n = 0;
+    pc = nullptr;
+    cout << "default constructor called; number of objects: " << ct << endl;
+    ShowObject();
 }
 
-Useless & Useless::operator=(Useless && f) { // move assignment
-  if (this == &f) return * this;
-  delete [] pc; n = f.n;
-  pc = f.pc;
-  f.n = 0;
-  f.pc = nullptr;
-  return * this;
+Useless::Useless(int k) : n(k)
+{
+    ++ct;
+    cout << "int constructor called; number of objects: " << ct << endl;
+    pc = new char[n];
+    ShowObject();
+}
+
+Useless::Useless(int k, char ch) : n(k)
+{
+    ++ct;
+    cout << "int, char constructor called; number of objects: " << ct << endl;
+    pc = new char[n];
+    for (int i = 0; i < n; i++)
+        pc[i] = ch;
+    ShowObject();
+}
+
+Useless::Useless(const Useless & f): n(f.n)
+{
+    ++ct;
+    cout << "copy const called; number of objects: " << ct << endl;
+    pc = new char[n];
+    for (int i = 0; i < n; i++)
+        pc[i] = f.pc[i];
+    ShowObject();
+}
+
+Useless::Useless(Useless && f): n(f.n)
+{
+    ++ct;
+    cout << "move constructor called; number of objects: " << ct << endl;
+    pc = f.pc;       // steal address
+    f.pc = nullptr;  // give old object nothing in return
+    f.n = 0;
+    ShowObject();
+}
+
+Useless::~Useless()
+{
+    cout << "destructor called; objects left: " << --ct << endl;
+    cout << "deleted object:\n";
+    ShowObject();
+    delete [] pc;
+}
+
+Useless Useless::operator+(const Useless & f)const
+{
+    cout << "Entering operator+()\n";
+    cout << "temp object:\n";
+    Useless temp = Useless(n + f.n);
+    for (int i = 0; i < n; i++)
+        temp.pc[i] = pc[i];
+    for (int i = n; i < temp.n; i++)
+        temp.pc[i] = f.pc[i - n];
+    cout << "Leaving operator+()\n";
+    return temp;
+}
+
+void Useless::ShowObject() const
+{
+    cout << "Number of elements: " << n;
+    cout << " Data address: " << (void * ) pc << "\n" << endl;
+}
+
+void Useless::ShowData() const
+{
+    for (int i = 0; i < n; i++)
+        cout << pc[i];
+    cout << endl;
 }
 
 // application
 int main()
 {
-  Useless one(10, 'x');
-  Useless two = one;
-  Useless three(20, 'o');0
-  Useless four (one + three); // calls operator+(), move constructor
+    {
+        Useless one(10, 'x');
+        Useless two = one; // calls copy constructor
+        Useless three(20, 'o');
+        Useless four (std::move(three)); // move constructor called
+        Useless five (one + three); // calls operator+(), RVO applied in Apple compiler
+
+    }
+    cin.get();
 }
 ```
 
@@ -298,7 +362,6 @@ std::unique_ptr<int> up = std::make_unique<int>(1);
 // auto up_copy = up; // Does not compile.
 auto up_move = std::move(up);
 ```
-
 Containers allow us to go one step further, and sometimes allow us to entirely avoid the move. This can happen when an item is being constructed "in place" inside the container. This operation is called "emplacement" and is
 supported by most Standard Library containers.
 ```cpp

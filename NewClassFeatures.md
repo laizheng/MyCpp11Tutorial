@@ -9,9 +9,33 @@ In C++11, there a total of 6 special member functions:
 + copy assignment operator
 + destructor
 
-Under certain circumstances they are defined by the compiler even if not defined by the user. The rule may be too complicated to put in this documents so I recommend you to check [this link](http://en.cppreference.com/w/cpp/language/member_functions#Special_member_functions) for the full legal descriptions. However, some notable exceptions where the default member functions are not generated are listed here:
-+ If you do provide a __destructor__ or a __copy constructor__ or a __copy assignment operator__, the compiler does not automatically provide a __move constructor__ or a __move assignment operator__.
-+ If you do provide a __move constructor__ or a __move assignment operator__, the compiler does not automatically provide a __copy constructor__ or a __copy assignment operator__.
+Under certain circumstances they are defined by the compiler even if not defined by the user. The following table provides good summaries as to when implicit member functions will be defined by compiler. Check out the C++11 ISO standard for rigid legal descriptions.
+
+| Member function | implicitly defined | default definition  |
+| ------------- |:-------------:| -----:|
+| Default constructor	| if no other constructors| 	does nothing
+| Destructor	| if no destructor|does nothing
+| Copy constructor | if no move constructor and no move assignment|	copies all members
+| Copy assignment | if no move constructor and no move assignment|	copies all members
+| Move constructor | if no destructor, no copy constructor and no copy nor move assignment|	moves all members
+| Move assignment | if no destructor, no copy nor move constructor, and no copy assignment |	moves all members
+
+__The rule of three/five/zero__
++ Rule of three (before C++11): if a class requires a user-defined destructor, a user-defined copy constructor, or a user-defined copy assignment operator, it almost certainly requires all three.
++ Rule of five (after C++11): Because the presence of a user-defined destructor, copy-constructor, or copy-assignment operator prevents implicit definition of the move constructor and the move assignment operator, any class for which move semantics are desirable, has to declare all five special member functions:
++ Rule of Zero (after C++11): Classes that have custom destructors, copy/move constructors or copy/move assignment operators should deal exclusively with ownership (which follows from the Single Responsibility Principle). Other classes should not have custom destructors, copy/move constructors or copy/move assignment operators.
+
+Rule of Zero basically means that one should never use a raw pointer to manage a resource. Therefore no destructor, copy constructor, copy assignment operator, move constructor and move assignment operator has to be implemented. In the following example, the management of char pointers are delegated to std::string, does the class in business logic is not required to have any custom destructors, copy/move constructors or copy/move assignment.  
+```cpp
+class rule_of_zero
+{
+    std::string cppstring;
+ public:
+    rule_of_zero(const std::string& arg) : cppstring(arg) {}
+};
+```
+
+
 
 ### Defaulted and Deleted Methods
 ********
