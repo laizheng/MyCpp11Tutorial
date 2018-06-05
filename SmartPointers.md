@@ -125,6 +125,12 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 + Copying a `std::shared_ptr` shares ownership: increase `use_count`.
 + Moving a `std::shared_ptr` transfers ownership: does not increase `use_count`.
+```cpp
+std::shared_ptr<int> sp = make_shared<int>(1);
+auto sp1 = sp; // share ownership
+auto sp2 = std::move(sp1); // transfer ownership
+```
+
 
 #### Constructing shared pointer
 ******
@@ -294,4 +300,54 @@ class Person
 	std::weak_ptr<Person> m_partner; // note: This is now a std::weak_ptr
   ...
 };
+```
+## Discussions Of Using Smart pointers
+******
+__Dynamic allocation has cost__
++ Objects on the stack are generally easier to reason about and more "predictable"
++ Allocations are not free, they can reduce locality, and compiler is often not able to aggressively optimize
++ If allocation is necessary, use smart pointers over new/delete
+
+__std::unique_ptr as first choice__
++ Zero-cost abstraction over new/delete
++ Simple to reason about
+
+__std::shared_ptr should be used sparingly__
++ Not a zero-cost abstraction over new/delete
++ Harder to reason about
+
+__Always use std::make_xxx to create smart pointers__
++ Prevent potential memory leaks
++ Better readability
++ Improve performance for std::shared_ptr
+
+__Pointers used in function arguments__
+```cpp
+#include <memory>
+
+// Observing/mutating an object: pass by reference.
+void f0(int&);
+void f1(const int&);
+
+// Observing/mutating a smart pointer: pass by reference.
+// For example, may be we want to reset a std::unique_ptr;
+// or check whether a std::unique_ptr has been expired
+void f2(std::unique_ptr<int>&);
+void f3(const std::unique_ptr<int>&);
+void f4(std::shared_ptr<int>&);
+void f5(const std::shared_ptr<int>&);
+void f6(std::weak_ptr<int>&);
+void f7(const std::weak_ptr<int>&);
+
+// Transferring ownership: pass by value.
+// This makes it clear that we don't want to observe or mutate a unique_ptr
+void f8(std::unique_ptr<int>);
+
+// Sharing ownership: pass by value.
+// Gives caller a chance to decide between Transferring/sharing ownership
+void f9(std::shared_ptr<int>);
+
+// Observing/mutating an optional object: pass by raw pointer.
+void f10(int*);
+void f11(const int*);
 ```
