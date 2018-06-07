@@ -17,7 +17,9 @@ std::shared_ptr<double> pshared = p_reg; // not allowed (implicit conversion)
 std::shared_ptr<double> pshared(p_reg); // allowed (explicit conversion)
 ```
 
-The smart pointer template classes are defined so that in most respects a smart pointer object acts like a regular pointer. For example, given that ps is a smart pointer object, you can dereference it (`*ps`), use it to access structure members (`ps->puffIndex`).
+The smart pointer template classes are defined so that in most respects a smart pointer object acts like a regular pointer. For example, given that ps is a smart pointer object, you can:
++ Dereference it (`*ps`)
++ Use it to access structure members (`ps->puffIndex`).
 
 To use smart pointers, the `<memory>` header must be included.
 ## Unique pointer
@@ -72,8 +74,8 @@ int main()
 ```
 #### Runtime overhead
 ******
-std::unique_ptr can be thought as a zero-cost abstract. Refer to the following comparison of assembly codes:
-![Over Head of std::unique_ptr](unique_ptr_overhead.png)
+std::unique_ptr can be thought as a zero-cost abstract. Refer to the following comparison of assembly codes:  
+[Over Head of std::unique_ptr](https://godbolt.org/g/j9shRf)
 #### Exception-safety
 ******
 There's no such guarantee in the evaluation order in C++ function parameters([Reference](https://stackoverflow.com/a/2934909/6585344)). Consider the following codes:
@@ -125,12 +127,12 @@ std::unique_ptr<T> make_unique(Args&&... args)
 
 + Copying a `std::shared_ptr` shares ownership: increase `use_count`.
 + Moving a `std::shared_ptr` transfers ownership: does not increase `use_count`.
+
 ```cpp
 std::shared_ptr<int> sp = make_shared<int>(1);
 auto sp1 = sp; // share ownership
 auto sp2 = std::move(sp1); // transfer ownership
 ```
-
 
 #### Constructing shared pointer
 ******
@@ -159,10 +161,9 @@ It's also possible to construct a std::shared_ptr by moving ownership from std::
 unique_ptr<Foo> u(new Foo);
 shared_ptr<Foo> f = move(u);
 ```
-
 #### Runtime overhead
 ******
-Check out the comparison of compiled codes here: [Link](https://godbolt.org/g/Khj7Yn).
+Check out the comparison of compiled codes here: [Link](https://godbolt.org/g/Khj7Yn).  
 `std::shared_ptr` has time overhead in constructor (to create the reference counter), in destructor (to decrement the reference counter and possibly destroy the object) and in assignment operator (to increment the reference counter). Due to thread-safety guarantees of std::shared_ptr, these increments/decrements are atomic, thus adding some more overhead.
 #### More on thread safety
 ******
