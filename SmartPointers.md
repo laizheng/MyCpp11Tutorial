@@ -65,9 +65,6 @@ void take_ownership(std::unique_ptr<foo> f)
 
 int main()
 {
-    ownership_transfer();
-    std::cout << "\n";
-
     auto f = bar();
     take_ownership(std::move(f)); // Need to use std::move, otherwise f is lvalue
 }
@@ -78,7 +75,7 @@ std::unique_ptr can be thought as a zero-cost abstract. Refer to the following c
 [Over Head of std::unique_ptr](https://godbolt.org/g/j9shRf)
 #### Exception-safety
 ******
-There's no such guarantee in the evaluation order in C++ function parameters([Reference](https://stackoverflow.com/a/2934909/6585344)). Consider the following codes:
+There's no such guarantee in the evaluation order in C++ function parameters(until C++17). Consider the following codes:
 ```cpp
 void foo(std::unique_ptr<int>, int);
 int bar() { throw std::runtime_error{"whoops!"}; }
@@ -136,7 +133,7 @@ auto sp2 = std::move(sp1); // transfer ownership
 
 #### Constructing shared pointer
 ******
-__Top line__: prefer using std::make_shared instead of constructing std::shared_ptr using raw pointer.
+__Prefer using std::make_shared instead of constructing std::shared_ptr using raw pointer.__
 
 It's legal to construct std::shared_ptr from raw pointer:
 ```cpp
@@ -170,7 +167,7 @@ Check out the comparison of compiled codes here: [Link](https://godbolt.org/g/Kh
 std::shared_ptr can work in multiple threads, provided each thread has __its own copy or copies__. In this case, the changes to the reference count are indeed synchronized(but it's our responsibility that make sure what we do with the shared data is correctly synchronized).
 + Standard guarantees reference counting is handled thread safe and it's platform independent
 + Standard guarantees that only one thread (holding last reference) will call delete on shared object
-+ shared_ptr does not guarantee any thread safety for object stored in it?
++ shared_ptr does not guarantee any thread safety for object stored in it
 
 ![Separate Instance is Thread-safe](shared_ptr_separate_instances.png)
 
