@@ -1,4 +1,6 @@
 # Lambda Functions
+Constructs a closure: an unnamed function object capable of capturing variables in scope.
+
 Suppose you wish to generate a list of random integers and determine how many of them are divisible by 3 and how many are divisible by 13. The following section demonstrate using three approaches for passing information to an STL algorithm: function pointers, functors, and lambdas.
 
 #### The How of Function Pointers, Functors, and Lambdas
